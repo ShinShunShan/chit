@@ -1,7 +1,7 @@
-"""Q30: RSA timing experiment standalone.
-Measures keygen, encrypt, decrypt times for selected key/message sizes.
+"""Q34: RSA timing experiment (standalone).
+Measures keygen, encrypt, decrypt times vs key/message sizes.
 Usage:
-  python q30.py
+  python q34.py
 """
 import time, secrets
 from Crypto.PublicKey import RSA
@@ -19,7 +19,8 @@ def encrypt_large(data:bytes,pub):
     t1=time.perf_counter(); return bytes(out), t1-t0
 
 def decrypt_large(ct:bytes,priv):
-    c=PKCS1_OAEP.new(priv, hashAlgo=SHA256); k=priv.size_in_bytes(); out=bytearray(); t0=time.perf_counter()
+    c=PKCS1_OAEP.new(priv, hashAlgo=SHA256)
+    k=priv.size_in_bytes(); out=bytearray(); t0=time.perf_counter()
     for i in range(0,len(ct),k): out.extend(c.decrypt(ct[i:i+k]))
     t1=time.perf_counter(); return bytes(out), t1-t0
 
@@ -31,4 +32,5 @@ def run():
             mlen=(mb+7)//8; msg=secrets.token_bytes(mlen)
             ct,te=encrypt_large(msg,pub); pt,td=decrypt_large(ct,key)
             print(f'{kb},{mb},{kg:.6f},{te:.6f},{td:.6f},{pt==msg}')
+
 if __name__=='__main__': run()
