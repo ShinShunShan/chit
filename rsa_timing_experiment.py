@@ -1,8 +1,16 @@
-"""RSA timing experiment: keygen, encrypt, decrypt vs key size and message size.
+"""RSA timing experiment: measure key generation, encryption, and decryption times.
+
+What this demonstrates
+- How key size affects RSA key generation cost and per-block operations.
+- That RSA encrypts only small chunks (message is chunked with OAEP padding).
+
+Printed CSV columns
+    key_bits,message_bits,keygen_s,encrypt_s,decrypt_s,ok
+
+Usage:
+    python rsa_timing_experiment.py
+
 Requires: pycryptodome
-Usage examples:
-  python rsa_timing_experiment.py
-It will run a small table of timings and print them.
 """
 import time
 import secrets
@@ -11,8 +19,9 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Hash import SHA256
 
-# Warning: RSA encrypts only small payloads (<= key_size_bytes - 2*hLen - 2 for OAEP) per operation.
-# We simulate "n-bit message" by chunking to allowed block size.
+# RSA handles only small payloads per call.
+# OAEP max plaintext bytes per block = key_bytes - 2*hash_len - 2.
+# We simulate larger messages by splitting into allowed-size blocks, encrypting each separately.
 
 def time_keygen(bits: int) -> float:
     t0 = time.perf_counter()
