@@ -1,8 +1,11 @@
-"""Q18: Custom encryption/decryption algorithm (educational).
-Uses the same XOR+rotate scheme as q05, packaged with CLI.
+"""Q18: Custom encryption/decryption algorithm (educational, stdlib-only).
+
+This intentionally simple scheme (XOR + bit rotation) is NOT secure and is only
+for learning about reversible transforms and CLI wiring without external libs.
+
 Usage:
-  python q18.py encrypt "Hello" key > out.hex
-  python q18.py decrypt <hex> key
+    python q18.py encrypt "Hello" key > out.hex
+    python q18.py decrypt <hex> key
 """
 import sys
 

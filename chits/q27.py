@@ -1,34 +1,48 @@
-"""Q27: Image security over an unsecured network (standalone AES-GCM).
-Encrypt image bytes with AES-GCM and write bundle JSON. Decrypt reverses it.
-Demo only: stores key in the JSON for convenience.
+"""Q27: Image confidentiality + integrity (stdlib-only, educational).
+
+No external crypto library. We use a SHA-1-based keystream (XOR) and a SHA-1 tag
+over (key||nonce||ciphertext). This is not secure like AES-GCM and is for learning.
 Usage:
   python q27.py encrypt input.jpg out.json
   python q27.py decrypt out.json restored.jpg
 """
-import sys, json, base64
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
+import sys, os, json, base64, hashlib
 
-def encrypt_image(in_path: str, out_path: str):
-    key=get_random_bytes(32); c=AES.new(key,AES.MODE_GCM)
-    data=open(in_path,'rb').read(); ct, tag = c.encrypt_and_digest(data)
-    bundle={'key':base64.b64encode(key).decode(),'nonce':base64.b64encode(c.nonce).decode(),'tag':base64.b64encode(tag).decode(),'cipher':base64.b64encode(ct).decode()}
-    json.dump(bundle, open(out_path,'w'))
-    print(f'Encrypted {in_path} -> {out_path}')
+def sha1(b: bytes) -> bytes: return hashlib.sha1(b).digest()
 
-def decrypt_image(in_path: str, out_path: str):
-    b=json.load(open(in_path))
+def stream(key: bytes, nonce: bytes, n: int) -> bytes:
+    out=bytearray(); ctr=0
+    while len(out)<n:
+        out.extend(sha1(key+nonce+ctr.to_bytes(4,'big')))
+        ctr+=1
+    return bytes(out[:n])
+
+def encrypt_image(inp: str, outp: str):
+    key=os.urandom(16); nonce=os.urandom(8)
+    data=open(inp,'rb').read()
+    ks=stream(key,nonce,len(data))
+    ct=bytes(a^b for a,b in zip(data,ks))
+    tag=sha1(key+nonce+ct)
+    bundle={'key':base64.b64encode(key).decode(),'nonce':base64.b64encode(nonce).decode(),'cipher':base64.b64encode(ct).decode(),'tag':base64.b64encode(tag).decode()}
+    json.dump(bundle, open(outp,'w'))
+    print(f'Encrypted {inp} -> {outp}')
+
+def decrypt_image(inp: str, outp: str):
+    b=json.load(open(inp,'r'))
     key=base64.b64decode(b['key']); nonce=base64.b64decode(b['nonce'])
-    tag=base64.b64decode(b['tag']); ct=base64.b64decode(b['cipher'])
-    c=AES.new(key,AES.MODE_GCM,nonce=nonce); data=c.decrypt_and_verify(ct,tag)
-    open(out_path,'wb').write(data)
-    print(f'Decrypted {in_path} -> {out_path}')
+    ct=base64.b64decode(b['cipher']); tag=base64.b64decode(b['tag'])
+    if sha1(key+nonce+ct)!=tag:
+        print('Tag mismatch'); return
+    ks=stream(key,nonce,len(ct))
+    data=bytes(a^b for a,b in zip(ct,ks))
+    open(outp,'wb').write(data)
+    print(f'Decrypted {inp} -> {outp}')
 
 if __name__=='__main__':
     if len(sys.argv)<4:
         print('Usage: python q27.py <encrypt|decrypt> <in> <out>')
     else:
-        act=sys.argv[1]
-        if act=='encrypt': encrypt_image(sys.argv[2], sys.argv[3])
-        elif act=='decrypt': decrypt_image(sys.argv[2], sys.argv[3])
+        a=sys.argv[1]
+        if a=='encrypt': encrypt_image(sys.argv[2], sys.argv[3])
+        elif a=='decrypt': decrypt_image(sys.argv[2], sys.argv[3])
         else: print('Action must be encrypt or decrypt')

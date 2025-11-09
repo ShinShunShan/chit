@@ -1,4 +1,9 @@
-"""Q21: SHA-1 hashing demonstration (message or file)."""
+"""Q21: SHA-1 hashing demonstration (message or file, stdlib-only).
+
+Shows how to compute SHA-1 for short strings or streaming file data. SHA-1 is
+considered broken for collision resistance; prefer SHA-256 or better in real
+applications. Included here due to exercise requirement.
+"""
 import sys, hashlib
 
 def h_msg(m:str)->str: return hashlib.sha1(m.encode()).hexdigest()

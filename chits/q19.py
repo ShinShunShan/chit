@@ -1,5 +1,8 @@
-"""Q19: Vernam, One-Time Pad, Rail Fence implementations.
-Simple demonstrations with minimal code.
+"""Q19: Vernam cipher, One-Time Pad, and Rail Fence (all stdlib, educational).
+
+Vernam: XOR of message and equal-length key bytes.
+OTP: Truly random pad (secrets); NEVER reuse pad.
+Rail Fence: Transposition cipher pattern demonstration.
 """
 import secrets
 ALPHABET="ABCDEFGHIJKLMNOPQRSTUVWXYZ"

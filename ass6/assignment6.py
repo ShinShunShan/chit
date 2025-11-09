@@ -54,14 +54,14 @@ def main() -> None:
     print(f"Digital Signature (Sender X): {signature}")
 
     print("\nApplying key to each character")
-    print("Signed values: ", end="")
+    '''print("Signed values: ", end="")
     signed_chars = []
     for ch in message:
         sc = mod_exp(ord(ch), d, n)  
         signed_chars.append(sc)
         print(f"{sc} ", end="")
     print()
-
+    '''
     print("\nRecovering original characters using the key...")
     print("Recovered Message: ", end="")
     recovered = []
