@@ -1,79 +1,73 @@
-"""Q11: Secure messaging with RSA encryption + signature.
+"""Q11: Secure messaging with toy RSA encryption + signature (no external libs).
 
-Demonstrates end-to-end:
-- Keypairs: X and Y each generate RSA keys.
-- Confidentiality: X encrypts to Y using RSA-OAEP (SHA-256 inside OAEP).
-- Integrity/Non-repudiation: X signs plaintext using PKCS#1 v1.5 over SHA-256.
-- Verification: Y verifies signature, then decrypts the ciphertext.
+This version uses the pure-Python RSA from q02 (Miller-Rabin + textbook RSA).
+Security note: This is for learning only (no OAEP/PSS padding; small keys).
 
-Dependencies: Only PyCryptodome besides stdlib.
-Usage:
-    python q11.py
+Workflow
+- X and Y each generate RSA keys (n, e, d).
+- X encrypts a short message to Y: c = m^e mod n.
+- X signs the SHA-256 digest: s = H(m)^d mod n.
+- Y decrypts and verifies: H(m) == s^e mod n.
 """
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_OAEP
-from Crypto.Signature import pkcs1_15
-from Crypto.Hash import SHA256
 
-MESSAGE = b"CONFIDENTIAL DATA"  # what X sends to Y
+from q02 import generate_rsa  # pure-Python toy RSA
+import hashlib
 
-
-def generate_keys(bits=1024):
-    """Generate an RSA private/public keypair (fast 1024-bit for demo)."""
-    priv = RSA.generate(bits)
-    pub = priv.publickey()
-    return priv, pub
+MESSAGE = b"CONFIDENTIAL DATA"  # keep it small so m < n
 
 
-def encrypt_for_receiver(message: bytes, receiver_pub):
-    """Encrypt with OAEP so only the holder of receiver_priv can decrypt."""
-    cipher = PKCS1_OAEP.new(receiver_pub, hashAlgo=SHA256)
-    return cipher.encrypt(message)
+def rsa_encrypt_bytes(msg: bytes, e: int, n: int) -> bytes:
+    """Textbook RSA on bytes: encode to int, check fits under n, pow, return bytes.
+    NOTE: No padding. Only for tiny demos."""
+    m = int.from_bytes(msg, 'big')
+    if m >= n:
+        raise ValueError("Message too large for RSA modulus in toy demo")
+    c = pow(m, e, n)
+    # store ciphertext as same byte length as modulus
+    clen = (n.bit_length() + 7) // 8
+    return c.to_bytes(clen, 'big')
 
 
-def decrypt_received(ciphertext: bytes, receiver_priv):
-    """Decrypt OAEP ciphertext using receiver's private key."""
-    cipher = PKCS1_OAEP.new(receiver_priv, hashAlgo=SHA256)
-    return cipher.decrypt(ciphertext)
+def rsa_decrypt_bytes(ct: bytes, d: int, n: int) -> bytes:
+    c = int.from_bytes(ct, 'big')
+    m = pow(c, d, n)
+    mlen = (m.bit_length() + 7) // 8
+    return m.to_bytes(mlen, 'big')
 
 
-def sign_message(message: bytes, sender_priv):
-    """Create PKCS#1 v1.5 signature over SHA-256 digest of message."""
-    h = SHA256.new(message)
-    return pkcs1_15.new(sender_priv).sign(h)
+def sign_sha256(msg: bytes, d: int, n: int) -> int:
+    h = hashlib.sha256(msg).digest()
+    h_int = int.from_bytes(h, 'big')
+    return pow(h_int, d, n)
 
 
-def verify_signature(message: bytes, signature: bytes, sender_pub) -> bool:
-    """Return True if signature validates for message under sender's public key."""
-    h = SHA256.new(message)
-    try:
-        pkcs1_15.new(sender_pub).verify(h, signature)
-        return True
-    except Exception:
-        return False
+def verify_sha256(msg: bytes, sig: int, e: int, n: int) -> bool:
+    h = hashlib.sha256(msg).digest()
+    h_int = int.from_bytes(h, 'big')
+    return pow(sig, e, n) == h_int
 
 
 def demo():
-    # Generate keys for X and Y
-    x_priv, x_pub = generate_keys()
-    y_priv, y_pub = generate_keys()
+    # Generate tiny RSA keys for X and Y
+    n_x, e_x, d_x = generate_rsa(512)
+    n_y, e_y, d_y = generate_rsa(512)
 
-    # X encrypts the message for Y (confidentiality)
-    ciphertext = encrypt_for_receiver(MESSAGE, y_pub)
+    # X encrypts for Y
+    ct = rsa_encrypt_bytes(MESSAGE, e_y, n_y)
 
-    # X signs the original plaintext (non-repudiation, integrity)
-    signature = sign_message(MESSAGE, x_priv)
+    # X signs MESSAGE
+    sig = sign_sha256(MESSAGE, d_x, n_x)
 
     # Y decrypts
-    decrypted = decrypt_received(ciphertext, y_priv)
+    pt = rsa_decrypt_bytes(ct, d_y, n_y)
 
-    # Y verifies signature
-    sig_ok = verify_signature(decrypted, signature, x_pub)
+    # Y verifies signature using X's public key
+    ok = verify_sha256(pt, sig, e_x, n_x)
 
-    print("Original:", MESSAGE)
-    print("Ciphertext (hex):", ciphertext.hex()[:60] + '...')
-    print("Decrypted:", decrypted)
-    print("Signature valid:", sig_ok)
+    print("Ciphertext (hex):", ct.hex()[:60] + '...')
+    print("Decrypted:", pt)
+    print("Signature valid:", ok)
+
 
 if __name__ == '__main__':
     demo()

@@ -1,58 +1,36 @@
-"""Q13: Simple website with password protection techniques to resist password cracking.
-Features:
-- User registration with PBKDF2-HMAC-SHA256 (salted, many iterations)
-- Login verification with constant-time compare
-- Basic password policy checks
-- Simple per-IP rate limiting (in-memory)
-This is a teaching demo, not production!
-Run:
-  python q13.py
-Open http://127.0.0.1:5000
+"""Q13: Password protection (CLI version, no external libraries).
+
+This replaces the Flask web app with a simple command-line interface while
+demonstrating the same ideas:
+- PBKDF2-HMAC-SHA256 with per-user random salt and iterations
+- Basic password policy (>=8, upper, lower, digit)
+- Simple attempt counter (per-process, just to illustrate rate limiting)
+
+Usage examples:
+  python q13.py register alice MyPassword1
+  python q13.py login    alice MyPassword1
+  python q13.py show
 """
-from flask import Flask, request, redirect, render_template_string, session
-import os, time, hashlib, hmac
-from collections import defaultdict
 
-app = Flask(__name__)
-app.secret_key = os.urandom(16)
+import sys
+import os
+import time
+import hashlib
+import hmac
 
-# In-memory "database"
+
 USERS = {}  # username -> (iterations, salt_hex, hash_hex)
-ATTEMPTS = defaultdict(list)  # ip -> timestamps of login attempts
-
 ITER = 200_000
-LOCK_WINDOW = 60  # seconds
+ATTEMPTS = {}  # username -> [timestamps]
+LOCK_WINDOW = 60
 MAX_ATTEMPTS = 5
 
-PAGE = """
-<h2>{{ title }}</h2>
-{% if msg %}<p style='color:{{ 'green' if ok else 'red' }};'>{{ msg }}</p>{% endif %}
-<form method="post">
-  <label>Username: <input name="u"></label><br>
-  <label>Password: <input name="p" type="password"></label><br>
-  <button type="submit">Submit</button>
-</form>
-<p><a href="/register">Register</a> | <a href="/login">Login</a> | <a href="/">Home</a></p>
-"""
-
-HOME = """
-<h2>Home</h2>
-<p>Simple password protection demo.</p>
-<ul>
-<li><a href="/register">Register</a></li>
-<li><a href="/login">Login</a></li>
-</ul>
-{% if 'user' in session %}
-<p>Logged in as: {{ session['user'] }}</p>
-{% endif %}
-"""
 
 def strong_password(p: str) -> bool:
-    if len(p) < 8: return False
-    has_upper = any(c.isupper() for c in p)
-    has_lower = any(c.islower() for c in p)
-    has_digit = any(c.isdigit() for c in p)
-    return has_upper and has_lower and has_digit
+    return (
+        len(p) >= 8 and any(c.isupper() for c in p)
+        and any(c.islower() for c in p) and any(c.isdigit() for c in p)
+    )
 
 
 def store_password(password: str):
@@ -66,59 +44,71 @@ def verify(stored, password: str) -> bool:
     salt = bytes.fromhex(salt_hex)
     expected = bytes.fromhex(hash_hex)
     dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, it)
-    # Constant-time compare
     return hmac.compare_digest(dk, expected)
 
 
-def rate_limited(ip: str) -> bool:
+def rate_limited(user: str) -> bool:
     now = time.time()
-    # Keep only attempts within window
-    ATTEMPTS[ip] = [t for t in ATTEMPTS[ip] if now - t < LOCK_WINDOW]
-    return len(ATTEMPTS[ip]) >= MAX_ATTEMPTS
+    lst = ATTEMPTS.get(user, [])
+    lst = [t for t in lst if now - t < LOCK_WINDOW]
+    ATTEMPTS[user] = lst
+    return len(lst) >= MAX_ATTEMPTS
 
 
-def record_attempt(ip: str):
-    ATTEMPTS[ip].append(time.time())
+def record_attempt(user: str):
+    ATTEMPTS.setdefault(user, []).append(time.time())
 
-@app.route('/')
-def home():
-    return render_template_string(HOME)
 
-@app.route('/register', methods=['GET','POST'])
-def register():
-    msg = None; ok = False
-    if request.method == 'POST':
-        u = request.form.get('u','').strip()
-        p = request.form.get('p','')
-        if not u or not p:
-            msg = 'Please enter username and password.'
-        elif not strong_password(p):
-            msg = 'Password must be >=8 chars with upper, lower, digit.'
-        elif u in USERS:
-            msg = 'User exists.'
-        else:
-            USERS[u] = store_password(p)
-            msg = 'Registered successfully.'; ok = True
-    return render_template_string(PAGE, title='Register', msg=msg, ok=ok)
+def cmd_register(user: str, password: str):
+    if not user or not password:
+        print('Provide username and password')
+        return
+    if user in USERS:
+        print('User exists')
+        return
+    if not strong_password(password):
+        print('Weak password: need upper, lower, digit, >=8')
+        return
+    USERS[user] = store_password(password)
+    print('Registered')
 
-@app.route('/login', methods=['GET','POST'])
-def login():
-    msg = None; ok = False
-    ip = request.remote_addr or 'local'
-    if request.method == 'POST':
-        if rate_limited(ip):
-            msg = 'Too many attempts. Try again later.'
-        else:
-            u = request.form.get('u','').strip()
-            p = request.form.get('p','')
-            record_attempt(ip)
-            stored = USERS.get(u)
-            if stored and verify(stored, p):
-                session['user'] = u
-                msg = 'Login successful.'; ok = True
-            else:
-                msg = 'Invalid credentials.'
-    return render_template_string(PAGE, title='Login', msg=msg, ok=ok)
+
+def cmd_login(user: str, password: str):
+    if rate_limited(user):
+        print('Too many attempts; wait')
+        return
+    record_attempt(user)
+    rec = USERS.get(user)
+    if rec and verify(rec, password):
+        print('Login OK')
+    else:
+        print('Invalid credentials')
+
+
+def cmd_show():
+    # Show stored users (salt+hash only) to understand representation
+    for u, rec in USERS.items():
+        it, salt_hex, hash_hex = rec
+        print(f"{u}: {it}:{salt_hex}:{hash_hex}")
+
+
+def main():
+    if len(sys.argv) < 2:
+        print('Usage:')
+        print('  python q13.py register <user> <password>')
+        print('  python q13.py login <user> <password>')
+        print('  python q13.py show')
+        return
+    cmd = sys.argv[1]
+    if cmd == 'register' and len(sys.argv) >= 4:
+        cmd_register(sys.argv[2], sys.argv[3])
+    elif cmd == 'login' and len(sys.argv) >= 4:
+        cmd_login(sys.argv[2], sys.argv[3])
+    elif cmd == 'show':
+        cmd_show()
+    else:
+        print('Invalid usage')
+
 
 if __name__ == '__main__':
-    app.run()
+    main()
