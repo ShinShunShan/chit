@@ -1,8 +1,13 @@
-"""Q10: Password protection demo using PBKDF2 (salted hashing) for storage.
-Shows how to hash and verify passwords to resist simple cracking.
+"""Q10: Password protection demo using PBKDF2-HMAC-SHA256.
+
+Concepts:
+- Salt: random per password prevents rainbow table reuse.
+- Iterations: slow down brute-force (adjust upward over time).
+- Verification: recompute derived key and compare in constant time.
+
 Usage:
-  python q10.py hash MyPassword
-  python q10.py verify <stored> MyPassword
+    python q10.py hash MyPassword
+    python q10.py verify <stored> MyPassword
 Stored format: iterations:salt_hex:hash_hex
 """
 import sys, os, hashlib, binascii
@@ -11,12 +16,14 @@ ITERATIONS = 150000
 
 
 def hash_password(password: str) -> str:
+    """Return encoded record containing iterations, salt, and derived key."""
     salt = os.urandom(16)
     dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, ITERATIONS)
     return f"{ITERATIONS}:{salt.hex()}:{dk.hex()}"
 
 
 def verify_password(stored: str, password: str) -> bool:
+    """Check password against stored record; returns True on match."""
     try:
         iterations_str, salt_hex, hash_hex = stored.split(':')
         it = int(iterations_str)
@@ -25,6 +32,7 @@ def verify_password(stored: str, password: str) -> bool:
     except Exception:
         return False
     dk = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, it)
+    # Use hash-of-dk comparison to keep timing uniform
     return hashlib.sha256(dk).digest() == hashlib.sha256(original).digest()
 
 

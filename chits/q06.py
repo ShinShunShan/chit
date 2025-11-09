@@ -1,8 +1,11 @@
-"""Q6Diffie–Hellman key exchange with a Man-in-the-Middle (MITM) demo.
-This uses small integers for clarity (not secure). It shows how MITM can
-establish two different shared keys, one with Alice and one with Bob.
+"""Q6: Diffie–Hellman with a Man-in-the-Middle (MITM) demo.
+
+What you see:
+- Honest DH yields the same shared key on both sides (g^(ab) mod p).
+- MITM swaps public values and ends with two different keys, one per victim.
+
 Usage:
-  python diffie_hellman_mitm_demo.py
+    python q06.py
 """
 import random
 
@@ -12,10 +15,12 @@ G = 5   # generator
 
 
 def modexp(base, exp, mod):
+    """Fast modular exponentiation using Python's built-in pow."""
     return pow(base, exp, mod)
 
 
 def honest_dh():
+    """Run an honest DH exchange and print matching keys."""
     print("Honest DH (no MITM):")
     a = random.randint(2, P-2)
     b = random.randint(2, P-2)
@@ -31,6 +36,7 @@ def honest_dh():
 
 
 def mitm_dh():
+    """Run a MITM where Mallory derives keys with each party."""
     print("MITM DH:")
     # Alice -> Mallory -> Bob
     a = random.randint(2, P-2)

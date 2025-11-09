@@ -1,12 +1,14 @@
-"""Q11: Secure messaging with RSA for confidentiality + signature for non-repudiation + SHA-256 hash for integrity.
-Demonstrates:
-- X generates RSA key pair.
-- Encrypt message for Y using Y's public key (RSA OAEP).
-- Sign message with X's private key (RSA PKCS#1 v1.5) over SHA-256 digest.
-- Verify signature and decrypt.
-Requires pycryptodome.
+"""Q11: Secure messaging with RSA encryption + signature.
+
+Demonstrates end-to-end:
+- Keypairs: X and Y each generate RSA keys.
+- Confidentiality: X encrypts to Y using RSA-OAEP (SHA-256 inside OAEP).
+- Integrity/Non-repudiation: X signs plaintext using PKCS#1 v1.5 over SHA-256.
+- Verification: Y verifies signature, then decrypts the ciphertext.
+
+Dependencies: Only PyCryptodome besides stdlib.
 Usage:
-  python q11.py
+    python q11.py
 """
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
@@ -17,27 +19,32 @@ MESSAGE = b"CONFIDENTIAL DATA"  # what X sends to Y
 
 
 def generate_keys(bits=1024):
+    """Generate an RSA private/public keypair (fast 1024-bit for demo)."""
     priv = RSA.generate(bits)
     pub = priv.publickey()
     return priv, pub
 
 
 def encrypt_for_receiver(message: bytes, receiver_pub):
+    """Encrypt with OAEP so only the holder of receiver_priv can decrypt."""
     cipher = PKCS1_OAEP.new(receiver_pub, hashAlgo=SHA256)
     return cipher.encrypt(message)
 
 
 def decrypt_received(ciphertext: bytes, receiver_priv):
+    """Decrypt OAEP ciphertext using receiver's private key."""
     cipher = PKCS1_OAEP.new(receiver_priv, hashAlgo=SHA256)
     return cipher.decrypt(ciphertext)
 
 
 def sign_message(message: bytes, sender_priv):
+    """Create PKCS#1 v1.5 signature over SHA-256 digest of message."""
     h = SHA256.new(message)
     return pkcs1_15.new(sender_priv).sign(h)
 
 
 def verify_signature(message: bytes, signature: bytes, sender_pub) -> bool:
+    """Return True if signature validates for message under sender's public key."""
     h = SHA256.new(message)
     try:
         pkcs1_15.new(sender_pub).verify(h, signature)

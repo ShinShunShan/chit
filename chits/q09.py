@@ -1,14 +1,17 @@
-"""Q9: SHA-1 hashing demo (message or file).
+"""Q9: SHA-1 hashing demo (message or file) — duplicate style for practice.
+
 Usage:
-  python q09.py message "Hello"
-  python q09.py file path/to/file
+    python q09.py message "Hello"
+    python q09.py file path/to/file
 """
 import sys, hashlib
 
 def hash_message(msg: str) -> str:
+    """SHA-1 of a UTF-8 string (hex)."""
     return hashlib.sha1(msg.encode()).hexdigest()
 
 def hash_file(path: str) -> str:
+    """SHA-1 of a file read in 4KB streaming chunks."""
     h = hashlib.sha1()
     with open(path, 'rb') as f:
         for chunk in iter(lambda: f.read(4096), b''):

@@ -1,20 +1,29 @@
-"""Q3: Implement Vernam, Vigenere, One-Time Pad (OTP) ciphers.
-All demos are simple and educational (not secure for real use).
+"""Q3: Implement Vernam, Vigenère, and One-Time Pad (OTP) ciphers.
+
+Summary:
+- Vernam: XOR plaintext with same-length key (reversible). Secure only if key truly random & single-use.
+- Vigenère: Repeating key shifts (polyalphabetic substitution). Broken by frequency + Kasiski.
+- OTP: Vernam with perfect secrecy constraints (random, same length, never reused).
+
+Dependencies: Only Python stdlib (secrets for randomness).
 """
 import secrets
 ALPHABET="ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 def vernam_encrypt(text:str, key:str)->str:
+    """Return hex ciphertext by XORing plaintext bytes with key bytes."""
     a=text.encode(); b=key.encode()
     if len(a)!=len(b): raise ValueError("Key must equal message length")
     return bytes(x^y for x,y in zip(a,b)).hex()
 
 def vernam_decrypt(hexct:str, key:str)->str:
+    """Invert XOR to recover original plaintext from hex ciphertext."""
     c=bytes.fromhex(hexct); b=key.encode()
     if len(c)!=len(b): raise ValueError("Key must equal cipher length")
     return bytes(x^y for x,y in zip(c,b)).decode()
 
 def vigenere_encrypt(text,key):
+    """Encrypt using Vigenère shifts based on key letters."""
     shifts=[ALPHABET.index(k) for k in key.upper() if k in ALPHABET]
     if not shifts: raise ValueError("Key must contain letters")
     out=[]; j=0
@@ -25,6 +34,7 @@ def vigenere_encrypt(text,key):
     return ''.join(out)
 
 def vigenere_decrypt(text,key):
+    """Reverse Vigenère shifts to recover plaintext."""
     shifts=[ALPHABET.index(k) for k in key.upper() if k in ALPHABET]
     out=[]; j=0
     for ch in text.upper():
@@ -34,17 +44,19 @@ def vigenere_decrypt(text,key):
     return ''.join(out)
 
 def otp_encrypt(message:str):
+    """Generate random pad and return (pad_hex, ciphertext_hex) via XOR."""
     data=message.encode(); pad=secrets.token_bytes(len(data))
     ct=bytes(x^y for x,y in zip(data,pad))
     return pad.hex(), ct.hex()
 
 def otp_decrypt(cipher_hex:str, pad_hex:str)->str:
+    """Recover plaintext using provided pad (must be same length)."""
     c=bytes.fromhex(cipher_hex); p=bytes.fromhex(pad_hex)
     if len(c)!=len(p): raise ValueError("Pad length mismatch")
     return bytes(x^y for x,y in zip(c,p)).decode()
 
 if __name__=='__main__':
-    msg="HELLO"; key_same="WORLD"  # same length for Vernam/OTP demo
+    msg="HELLO"; key_same="WORLD"  # same length required for Vernam & OTP
     print("Vernam enc:", vernam_encrypt(msg, key_same))
     pad_hex, ct_hex = otp_encrypt(msg)
     print("OTP pad:", pad_hex); print("OTP ct:", ct_hex)
