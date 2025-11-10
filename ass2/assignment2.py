@@ -1,106 +1,77 @@
-def gcd(a: int, b: int) -> int:
-    
-    while b != 0:
+import time
+def power(base, expo, m):
+    """Compute (base^expo) % m"""
+    return pow(base, expo, m)
+
+def mod_inverse(e, phi):
+    """Compute modular inverse of e under modulo phi"""
+    return pow(e, -1, phi)
+
+def generate_keys(p, q):
+    """Generate RSA keys"""
+    n = p * q
+    phi = (p - 1) * (q - 1)
+
+    e = 2
+    while e < phi:
+        if gcd(e, phi) == 1:
+            break
+        e += 1
+
+    d = mod_inverse(e, phi)
+    return e, d, n
+
+def gcd(a, b):
+    """Greatest Common Divisor"""
+    while b:
         a, b = b, a % b
     return a
 
-def is_prime(x: int) -> bool:
-    if x < 2:
-        return False
-    if x % 2 == 0:
-        return x == 2
-    d = 3
-    while d * d <= x:
-        if x % d == 0:
-            return False
-        d += 2
-    return True
+def encrypt(m, e, n):
+    """Encrypt message m using (e, n)"""
+    return power(m, e, n)
+
+def decrypt(c, d, n):
+    """Decrypt ciphertext c using (d, n)"""
+    return power(c, d, n)
 
 
-def mod_inverse(e: int, phi: int) -> int:
-   
-    for i in range(1, phi):
-        if (e * i) % phi == 1:
-            return i
-    return 0
+def main():
+    # Manual inputs
+    p = int(input("Enter prime number p: "))
+    q = int(input("Enter prime number q: "))
+    M = int(input("Enter message (integer): "))
 
+    # Key generation timing
+    t_key_start = time.time_ns()
+    e, d, n = generate_keys(p, q)
+    t_key_end = time.time_ns()
+    key_gen_time = t_key_end - t_key_start
 
-def mod_exp(base: int, exp: int, mod: int) -> int:
-   
-    result = 1
-    base %= mod
-    while exp > 0:
-        if exp % 2 == 1:
-            result = (result * base) % mod
-        exp //= 2
-        base = (base * base) % mod
-    return result
+    # Encryption timing
+    t_enc_start = time.time_ns()
+    C = encrypt(M, e, n)
+    t_enc_end = time.time_ns()
+    enc_time = t_enc_end - t_enc_start
 
+    # Decryption timing
+    t_dec_start = time.time_ns()
+    D = decrypt(C, d, n)
+    t_dec_end = time.time_ns()
+    dec_time = t_dec_end - t_dec_start
 
-def main() -> None:
-    # Input primes p, q (>5) with basic validation
-    while True:
-        try:
-            p = int(input("Enter prime number p (>5): ").strip())
-            q = int(input("Enter prime number q (>5): ").strip())
-        except ValueError:
-            print("Please enter valid integers for p and q.\n")
-            continue
+    # Print results
+    print(f"Total key generation time: {key_gen_time} ns ({key_gen_time / 1e6:.6f} ms)")
+    print(f"Encryption time: {enc_time} ns ({enc_time / 1e6:.6f} ms)")
+    print(f"Decryption time: {dec_time} ns ({dec_time / 1e6:.6f} ms)\n")
 
-        if p <= 5 or q <= 5:
-            print("Both p and q must be > 5.\n")
-            continue
-        if not is_prime(p) or not is_prime(q):
-            print("Both p and q must be prime.\n")
-            continue
-        if p == q:
-            print("p and q should be distinct primes.\n")
-            continue
-        break
-
-    n = p * q
-    phi = (p - 1) * (q - 1)
-    print(f"n = {n}, phi = {phi}")
-
-    # Read e until coprime with phi and in (1, phi)
-    while True:
-        try:
-            e = int(input("Enter public key e (1 < e < phi) coprime with phi: ").strip())
-        except ValueError:
-            print("Please enter an integer for e.\n")
-            continue
-        if 1 < e < phi and gcd(e, phi) == 1:
-            d = mod_inverse(e, phi)
-            if d != 0:
-                break
-        print("Invalid e! Try again.\n")
-
-    print(f"Private key d = {d}")
-
-    # Read plaintext, force uppercase and A-Z only
-    while True:
-        message = input("Enter plaintext message (A-Z only): ").strip().upper()
-        if all('A' <= ch <= 'Z' for ch in message):
-            break
-        print("Message must contain only letters A-Z (no spaces/symbols).\n")
-
-    # Encrypt: each letter as m in [0,25]
-    cipher: list[int] = []
-    print("\nCiphertext: ", end="")
-    for ch in message:
-        m = ord(ch) - ord('A')
-        c = mod_exp(m, e, n)
-        cipher.append(c)
-        print(f"{c} ", end="")
-    print()
-
-    # Decrypt
-    print("Decrypted message: ", end="")
-    for c in cipher:
-        m = mod_exp(c, d, n)
-        print(chr(m + ord('A')), end="")
-    print()
+    print(f"Public Key (e, n): ({e}, {n})")
+    print(f"Private Key (d, n): ({d}, {n})")
+    print(f"Original Message: {M}")
+    print(f"Encrypted Message: {C}")
+    print(f"Decrypted Message: {D}")
 
 
 if __name__ == "__main__":
     main()
+

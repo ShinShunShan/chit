@@ -1,0 +1,91 @@
+import socket
+import hashlib
+
+def gcd(a, b):
+    while b != 0:
+        a, b = b, a % b
+    return a
+
+def mod_inverse(e, phi):
+    for d in range(1, phi):
+        if (e * d) % phi == 1:
+            return d
+    return -1
+
+def mod_pow(base, exp, mod):
+    result = 1
+    for _ in range(exp):
+        result = (result * base) % mod
+    return result
+
+def generate_keys():
+    p = 13
+    q = 17
+    n = p * q
+    phi = (p - 1) * (q - 1)
+
+    e = 2
+    while e < phi:
+        if gcd(e, phi) == 1:
+            break
+        e += 1
+
+    d = mod_inverse(e, phi)
+    return e, d, n
+
+def encrypt(msg, e, n):
+    return mod_pow(msg, e, n)
+
+def sha256(input_str):
+    h = hashlib.sha256(input_str.encode()).hexdigest()
+    return h
+
+def sign(message, d, n):
+    hash_hex = sha256(message)
+    hash_val = abs(hash(hash_hex) % n)
+    return encrypt(hash_val, d, n)
+
+def main():
+    e, d, n = generate_keys()
+
+    print(f" Public Key (e, n): ({e}, {n})")
+    print(f"Private Key (d, n): ({d}, {n})")
+
+    message = input("\nEnter message: ")
+
+    encrypted = [encrypt(ord(ch), e, n) for ch in message]
+
+    # Hash + signature
+    hash_hex = sha256(message)
+    hash_val = abs(hash_hex.__hash__() % n)
+    signature = encrypt(hash_val, d, n)
+
+    print(f"\n Message Hash (SHA-256): {hash_hex}")
+    print(f" Hash Value (mod n): {hash_val}")
+    print(f" Encrypted Hash / Signature: {signature}")
+
+    # Connect to receiver
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.connect(("localhost", 5000))
+        out = sock.makefile("w")
+        inp = sock.makefile("r")
+
+        # Send public + private + signature
+        out.write(str(e) + "\n")
+        out.write(str(n) + "\n")
+        out.write(str(d) + "\n")
+        out.write(str(signature) + "\n")
+
+        out.write(str(len(encrypted)) + "\n")
+        for val in encrypted:
+            out.write(str(val) + "\n")
+
+        out.flush()
+
+        print("\n Data sent to Receiver.")
+
+        response = inp.readline().strip()
+        print("\n Receiver Response: " + response)
+
+if __name__ == "__main__":
+    main()

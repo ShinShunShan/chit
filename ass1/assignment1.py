@@ -1,4 +1,5 @@
 import random
+import secrets
 
 # --- Compact classical ciphers (simple and basic) ---
 
@@ -107,6 +108,35 @@ def vernam(text, key):
         return ''
     return ''.join(chr(ord(a) ^ ord(b)) for a,b in zip(text, key))
 
+# --- One-Time Pad (OTP) Vernam cipher helpers ---
+def otp_encrypt(message: str):
+    """Generate a random one-time pad equal to message length and XOR.
+    Returns (pad_hex, ciphertext_hex). Keep the pad secret and never reuse it.
+    """
+    data = message.encode('utf-8')
+    if len(data) == 0:
+        return '', ''
+    pad = secrets.token_bytes(len(data))
+    ct = bytes(a ^ b for a, b in zip(data, pad))
+    return pad.hex(), ct.hex()
+
+def otp_decrypt(cipher_hex: str, pad_hex: str) -> str:
+    try:
+        ct = bytes.fromhex(cipher_hex)
+        pad = bytes.fromhex(pad_hex)
+    except ValueError:
+        print('Invalid hex input.')
+        return ''
+    if len(ct) != len(pad):
+        print('Pad length must equal ciphertext length.')
+        return ''
+    pt = bytes(a ^ b for a, b in zip(ct, pad))
+    try:
+        return pt.decode('utf-8')
+    except UnicodeDecodeError:
+        # Fallback to latin-1 to avoid failure on arbitrary bytes
+        return pt.decode('latin-1')
+
 
 def main():
     while True:
@@ -117,15 +147,17 @@ def main():
         print('4. Playfair')
         print('5. Rail Fence')
         print('6. Vernam (XOR)')
+        print('7. OTP Vernam (One-Time Pad)')
         print('0. Exit')
         ch = input('Choice: ').strip()
 
         if ch == '1':
             s = input('Text: ')
-            try:
-                k = int(input('Shift: '))
-            except ValueError:
-                print('Shift must be integer.'); continue
+            ks = input('Shift (integer): ')
+            if not ks.isdigit() and not (ks.startswith('-') and ks[1:].isdigit()):
+                print('Shift must be integer.')
+                continue
+            k = int(ks)
             m = input("Mode (e/d): ").lower()
             print('Result:', caesar(s, k, m))
 
@@ -152,10 +184,11 @@ def main():
 
         elif ch == '5':
             s = input('Text: ')
-            try:
-                r = int(input('Rails (>1): '))
-            except ValueError:
-                print('Rails must be integer.'); continue
+            rs = input('Rails (>1 integer): ')
+            if not rs.isdigit():
+                print('Rails must be integer.')
+                continue
+            r = int(rs)
             m = input('Mode (e/d): ').lower()
             print('Result:', rail_encrypt(s, r) if m=='e' else rail_decrypt(s, r))
 
@@ -166,6 +199,24 @@ def main():
             if enc:
                 print('Encrypted (hex):', ' '.join(f'{ord(c):02X}' for c in enc))
                 print('Decrypted:', vernam(enc, k))
+
+        elif ch == '7':
+            mode = input('Mode (e=encrypt / d=decrypt): ').strip().lower()
+            if mode == 'e':
+                s = input('Text: ')
+                pad_hex, ct_hex = otp_encrypt(s)
+                if pad_hex:
+                    print('Pad (hex):', pad_hex)
+                    print('Cipher (hex):', ct_hex)
+                    print('Note: Keep the pad secret and never reuse it!')
+            elif mode == 'd':
+                ct_hex = input('Cipher (hex): ').strip().replace(' ','')
+                pad_hex = input('Pad (hex): ').strip().replace(' ','')
+                pt = otp_decrypt(ct_hex, pad_hex)
+                if pt != '':
+                    print('Decrypted:', pt)
+            else:
+                print('Invalid mode.')
 
         elif ch == '0':
             print('Bye!'); break
